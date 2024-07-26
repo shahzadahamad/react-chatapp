@@ -6,7 +6,7 @@ import {
   signInWithEmailAndPassword,
 } from "firebase/auth";
 import { auth, db } from "../../lib/firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { collection, doc, getDocs, query, setDoc, where } from "firebase/firestore";
 import upload from "../../lib/upload";
 
 const Login = () => {
@@ -41,29 +41,40 @@ const Login = () => {
     }
   };
 
+  async function isUsernameUnique(username) {
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, where("username", "==", username));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.empty;
+  }
+
   const handleRegister = async (e) => {
     e.preventDefault();
     setLoading(true);
     const formData = new FormData(e.target);
     const { username, email, password } = Object.fromEntries(formData);
     try {
-      const res = await createUserWithEmailAndPassword(auth, email, password);
+      if (await isUsernameUnique(username)) {
+        const res = await createUserWithEmailAndPassword(auth, email, password);
 
-      const imgUrl = await upload(avatar.file);
+        const imgUrl = await upload(avatar.file);
 
-      await setDoc(doc(db, "users", res.user.uid), {
-        username,
-        email,
-        avatar: imgUrl,
-        id: res.user.uid,
-        blocked: [],
-      });
+        await setDoc(doc(db, "users", res.user.uid), {
+          username,
+          email,
+          avatar: imgUrl,
+          id: res.user.uid,
+          blocked: [],
+        });
 
-      await setDoc(doc(db, "userchats", res.user.uid), {
-        chats: [],
-      });
+        await setDoc(doc(db, "userchats", res.user.uid), {
+          chats: [],
+        });
 
-      toast.success("Account created! You can login now!");
+        toast.success("Account created! You can login now!");
+      } else {
+        toast.error("Username already in use!");
+      }
     } catch (err) {
       console.log(err.message);
       toast.error(err.message);
@@ -79,7 +90,7 @@ const Login = () => {
         <form onSubmit={handleLogin}>
           <input type="email" name="email" placeholder="Email" />
           <input type="password" name="password" placeholder="Password" />
-          <button disabled={loading}>{loading ? "Loading" : "Sign Up"}</button>
+          <button disabled={loading}>{loading ? "Loading" : "Sign In"}</button>
         </form>
       </div>
       <div className="separator"></div>
